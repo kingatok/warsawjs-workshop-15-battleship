@@ -7,12 +7,12 @@ class Component {
 }
 
 class CellComponent extends Component {
-	constructor(handleCellClick) {
+	constructor({ location, handleCellClick }) {
 		super();
 		this._state = 'unknown';
 		this._element = document.createElement('td');
 		this._element.addEventListener('click', function() {
-			handleCellClick();
+			handleCellClick({ location });
 		});
 		this._refresh();
 	}
@@ -28,22 +28,54 @@ class CellComponent extends Component {
 	}
 }
 
-class GameController {
-	constructor(cell) {
-		this._cell = cell;
+class BoardComponent extends Component {
+	constructor({ handleCellClick, size = 8 }) {
+		super();
+		this._element = document.createElement('table');
+		/*
+		References to cells.
+		@type {Object.<string.CellComponent>}
+		*/
+		this._cells = {};
+		for (let rowNumber = 0; rowNumber < size; rowNumber += 1) {
+			const rowElement = document.createElement('tr');
+			for (let columnNumber = 0; columnNumber < size; columnNumber += 1) {
+				const cell = new CellComponent({
+					handleCellClick,
+					location: { row: rowNumber, column: columnNumber }
+				});
+				rowElement.appendChild(cell.getElement());
+				// Also save a reference to the cell so that it can be addressed later
+				this._cells[`${rowNumber}X${columnNumber}`] = cell;
+			}
+			this._element.appendChild(rowElement);
+		}
 	}
-	handleCellClick() {
-		this._cell.setState('miss');
+
+	setCellState(location, state) {
+		const key = `${location.row}X${location.column}`;
+		this._cells[key].setState(state);
+	}
+}
+
+class GameController {
+	constructor(board) {
+		this._board = board;
+	}
+	handleCellClick({ location }) {
+		this._board.setCellState(location, 'miss');
 	}
 }
 
 let myController;
-function handleCellClick() {
-	myController.handleCellClick();
+function handleCellClick(...args) {
+	myController.handleCellClick.apply(myController, args);
 }
 
-const myCell = new CellComponent(handleCellClick);
-myController = new GameController(myCell);
-document
-	.getElementById('cellContainer')
-	.appendChild(myCell.getElement());
+const board = new BoardComponent({ handleCellClick })
+myController = new GameController(board);
+
+const boardContainer = document.getElementById('boardContainer').appendChild(board.getElement());
+
+
+

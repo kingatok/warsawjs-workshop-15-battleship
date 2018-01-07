@@ -90,15 +90,42 @@ class BoardModel {
 		this._cells = {}
 		for (let rowNumber = 0; rowNumber < size; rowNumber += 1) {
 			for (let columnNumber = 0; columnNumber < size; columnNumber += 1) {
-				this._cells[`${rowNumber}X${columnNumber}`] = new CellModel({ hasShip: false });
+				let hasShip;
+				if (Math.random() < 0.2) {
+					hasShip = true;
+				} else {
+					hasShip = false;
+				}
+				this._cells[`${rowNumber}X${columnNumber}`] = new CellModel({ hasShip: hasShip });
 			}
 		}
+		// Initialize an empty observer map
+		this._observers = {};
 	}
 
 	fireAt(location) {
 		const target = this._cells[`${location.row}X${location.column}`];
 		const firingResult = target.fire();
 		// TODO: Deliver the changes to the view!
+		if(firingResult) {
+			this._notifyObservers('firedAt', {location, firingResult});
+		}
+	}
+
+	_notifyObservers(type, data) {
+		// Run all saved observers for given type
+		(this._observers[type] || []).forEach(function(observer){
+			observer(data);
+		});
+	}
+
+	addObserver(type, observerFunction) {
+		// Save the observer function for running later
+		if (!this._observers[type]) {
+			this._observers[type] = [];
+		}
+		this._observers[type].push(observerFunction);
+
 	}
 }
 
@@ -110,6 +137,9 @@ function handleCellClick(...args) {
 const boardView = new BoardComponent({ handleCellClick })
 const boardModel = new BoardModel({ handleCellClick })
 myController = new GameController(boardModel);
+boardModel.addObserver('firedAt', function({ location, firingResult }) {
+	boardView.setCellState(location, firingResult);
+});
 
 const boardContainer = document.getElementById('boardContainer').appendChild(boardView.getElement());
 

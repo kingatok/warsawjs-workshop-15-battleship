@@ -29,7 +29,7 @@ class CellComponent extends Component {
 }
 
 class BoardComponent extends Component {
-	constructor({ handleCellClick, size = 8 }) {
+	constructor({ handleCellClick, size = 8, boardNumber }) {
 		super();
 		this._element = document.createElement('table');
 		/*
@@ -42,7 +42,7 @@ class BoardComponent extends Component {
 			for (let columnNumber = 0; columnNumber < size; columnNumber += 1) {
 				const cell = new CellComponent({
 					handleCellClick,
-					location: { row: rowNumber, column: columnNumber }
+					location: { row: rowNumber, column: columnNumber, boardNumber: boardNumber }
 				});
 				rowElement.appendChild(cell.getElement());
 				// Also save a reference to the cell so that it can be addressed later
@@ -55,6 +55,27 @@ class BoardComponent extends Component {
 	setCellState(location, state) {
 		const key = `${location.row}X${location.column}`;
 		this._cells[key].setState(state);
+	}
+}
+
+class GameComponent extends Component {
+	constructor( { handleCellClick, size = 8, boardNumber }) {
+		super();
+		this._boards = [
+			new BoardComponent({ handleCellClick, size, boardNumber: 0 }),
+			new BoardComponent({ handleCellClick, size, boardNumber: 1 })
+		];
+		this._element = document.createElement('div');
+		this._element.className = 'GameComponent';
+		// Add all children's DOM elements to ours
+		this._boards.forEach(function(childBoard) {
+			this._element.appendChild(childBoard.getElement());
+		}, this);
+	}
+
+	setCellState(location, state) {
+		const board = this._boards[location.boardNumber];
+		board.setCellState(location, state);
 	}
 }
 
@@ -86,7 +107,7 @@ class CellModel {
 }
 
 class BoardModel {
-	constructor({ size = 8 }) {
+	constructor({ size = 8 } = {}) {
 		this._cells = {}
 		for (let rowNumber = 0; rowNumber < size; rowNumber += 1) {
 			for (let columnNumber = 0; columnNumber < size; columnNumber += 1) {
@@ -104,8 +125,38 @@ class BoardModel {
 	}
 
 	fireAt(location) {
+		//TODO: Add turn handling. Check if it's the turn of the correct player
+		// or throw an error otherwise
 		const target = this._cells[`${location.row}X${location.column}`];
 		const firingResult = target.fire();
+		// TODO: Deliver the changes to the view!
+		return firingResult;
+	}
+
+	_notifyObservers(type, data) {
+		// Run all saved observers for given type
+		(this._observers[type] || []).forEach(function(observer){
+			observer(data);
+		});
+	}
+}
+
+class GameModel {
+	constructor({ boards }) {
+		this._boards = boards;
+		// Add the beggining, it's playesr o's turn (he shoots at board[1]).
+		this._turn = 0;
+		// Initialize an empty observer map
+		this._observers = {};
+	}
+
+	fireAt(location) {
+		//TODO: Add turn handling. Check if it's the turn of the correct player
+		// or throw an error otherwise
+		const boardNumber = location.boardNumber;
+		const board = this._boards[boardNumber];
+		// Tell the board to handle the firing
+		const firingResult = board.fireAt(location);
 		// TODO: Deliver the changes to the view!
 		if(firingResult) {
 			this._notifyObservers('firedAt', {location, firingResult});
@@ -134,14 +185,16 @@ function handleCellClick(...args) {
 	myController.handleCellClick.apply(myController, args);
 }
 
-const boardView = new BoardComponent({ handleCellClick })
-const boardModel = new BoardModel({ handleCellClick })
-myController = new GameController(boardModel);
-boardModel.addObserver('firedAt', function({ location, firingResult }) {
-	boardView.setCellState(location, firingResult);
+const gameView = new GameComponent({ handleCellClick });
+const boardModels = [ new BoardModel(), new BoardModel() ];
+const gameModel = new GameModel({ boards: boardModels });
+
+myController = new GameController(gameModel);
+gameModel.addObserver('firedAt', function({ location, firingResult }) {
+	gameView.setCellState(location, firingResult);
 });
 
-const boardContainer = document.getElementById('boardContainer').appendChild(boardView.getElement());
+const gameContainer = document.getElementById('gameContainer').appendChild(gameView.getElement());
 
 
 
